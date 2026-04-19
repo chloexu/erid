@@ -1,4 +1,4 @@
-# Phase 2 Redesign — Tools, Orchestration & Agent Identity
+# Erid — Phase 2 Design: Tools, Orchestration & Agent Identity
 
 **Date:** 2026-04-19
 **Scope:** Phase 2 full redesign
