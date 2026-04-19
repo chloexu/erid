@@ -35,7 +35,17 @@ The more you feed it, the more it sounds like you.
 ```bash
 cp .env.example .env
 # Add ANTHROPIC_API_KEY and TAVILY_API_KEY
+
+# Create a virtual environment (ARM64 on Apple Silicon)
+arch -arm64 /Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
+```
+
+After the one-time setup, just activate before running:
+
+```bash
+source .venv/bin/activate
 ```
 
 ## Usage
@@ -44,6 +54,37 @@ pip install -r requirements.txt
 python main.py "What is LangGraph and how does it work?"
 python main.py "How does auth work in my chefs-hub project?"
 python main.py "Should I use FastAPI or Django for this service?"
+```
+
+### Output modes
+
+By default, output uses simple labels:
+
+```
+Thinking...
+[tool_use] search
+[tool_result] search
+  <raw Tavily response>
+Thinking...
+<final answer streams here>
+```
+
+Add `--verbose` (or `-v`) to see granular labels that show exactly what each line is and where it comes from:
+
+```
+[agent: loop 1/10] deciding next action...   ← local loop, LLM about to stream
+<raw LLM tokens>                             ← Anthropic stream, unprocessed
+[tool_call → search]                         ← LLM decided to call a tool
+  input: {'query': '...'}
+[tool_result ← search] raw response:         ← raw Tavily API response, no processing
+  <result>
+[agent: loop 2/10] deciding next action...
+<final answer streams here>
+```
+
+```bash
+python main.py "What is LangGraph?" --verbose
+python main.py "What is LangGraph?" -v
 ```
 
 ## Phases
