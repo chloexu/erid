@@ -131,3 +131,33 @@ def test_researcher_tool_node_executes_search():
     assert last["role"] == "user"
     assert last["content"][0]["type"] == "tool_result"
     assert last["content"][0]["content"] == "Search results here"
+
+
+# ── Summarizer ─────────────────────────────────────────────────────────────────
+
+from agents.summarizer import summarizer_node
+
+
+def _summarizer_state(research_text: str) -> AgentState:
+    return {
+        "messages": [
+            {"role": "user", "content": "What is LangGraph?"},
+            {"role": "assistant", "content": [{"type": "text", "text": research_text}]},
+        ],
+        "query": "What is LangGraph?",
+        "iterations": 1,
+        "route": "research",
+        "answer": "",
+    }
+
+
+def test_summarizer_returns_answer():
+    with patch("agents.summarizer.stream_text_turn", return_value="LangGraph is a framework. [Source: example.com]"):
+        result = summarizer_node(_summarizer_state("LangGraph is a state graph library."))
+    assert result["answer"] == "LangGraph is a framework. [Source: example.com]"
+
+
+def test_summarizer_answer_is_string():
+    with patch("agents.summarizer.stream_text_turn", return_value="Some answer."):
+        result = summarizer_node(_summarizer_state("context"))
+    assert isinstance(result["answer"], str)
