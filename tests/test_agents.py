@@ -161,3 +161,66 @@ def test_summarizer_answer_is_string():
     with patch("agents.summarizer.stream_text_turn", return_value="Some answer."):
         result = summarizer_node(_summarizer_state("context"))
     assert isinstance(result["answer"], str)
+
+
+# ── Decision ───────────────────────────────────────────────────────────────────
+
+from agents.decision import decision_agent_node, decision_tool_node, decision_should_continue
+
+
+def _decision_state(query: str = "FastAPI vs Django?") -> AgentState:
+    return {
+        "messages": [{"role": "user", "content": query}],
+        "query": query,
+        "iterations": 0,
+        "route": "decide",
+        "answer": "",
+    }
+
+
+def test_decision_agent_node_returns_updated_messages():
+    with patch("agents.decision.stream_agent_turn", return_value=[{"type": "text", "text": "## Decision\nUse FastAPI."}]):
+        result = decision_agent_node(_decision_state())
+    assert len(result["messages"]) == 2
+    assert result["messages"][-1]["role"] == "assistant"
+    assert result["iterations"] == 1
+
+
+def test_decision_should_continue_tools():
+    state = _decision_state()
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": "x", "name": "read_file", "input": {"path": "kb/prefs.md"}}],
+    })
+    assert decision_should_continue(state) == "decision_tools"
+
+
+def test_decision_should_continue_end_on_text():
+    state = _decision_state()
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "text", "text": "## Decision\nUse FastAPI."}],
+    })
+    assert decision_should_continue(state) == "end"
+
+
+def test_decision_should_continue_end_on_max_iterations():
+    state = _decision_state()
+    state["iterations"] = 10
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": "x", "name": "search", "input": {}}],
+    })
+    assert decision_should_continue(state) == "end"
+
+
+def test_decision_tool_node_executes_read_file():
+    state = _decision_state()
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": "tu_1", "name": "read_file", "input": {"path": "kb/prefs.md"}}],
+    })
+    with patch("agents.decision.read_file", return_value="Prefer FastAPI."):
+        result = decision_tool_node(state)
+    last = result["messages"][-1]
+    assert last["content"][0]["content"] == "Prefer FastAPI."
