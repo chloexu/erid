@@ -16,25 +16,50 @@ MAX_ITERATIONS = 10
 
 
 def agent_node(state: AgentState) -> dict:
-    response = _client.messages.create(
+    import json
+    print("\nThinking...", flush=True)
+    content = []
+    current_tool: dict | None = None
+
+    with _client.messages.stream(
         model="claude-sonnet-4-6",
         max_tokens=4096,
         system=SYSTEM_PROMPT,
         tools=TOOLS_SCHEMA,
         messages=state["messages"],
-    )
-    # Serialize content blocks to plain dicts
-    content = []
-    for block in response.content:
-        if block.type == "text":
-            content.append({"type": "text", "text": block.text})
-        elif block.type == "tool_use":
-            content.append({
-                "type": "tool_use",
-                "id": block.id,
-                "name": block.name,
-                "input": block.input,
-            })
+    ) as stream:
+        for event in stream:
+            event_type = type(event).__name__
+
+            if event_type == "RawContentBlockStartEvent":
+                block = event.content_block
+                if block.type == "tool_use":
+                    current_tool = {"type": "tool_use", "id": block.id, "name": block.name, "input": ""}
+                    print(f"\n[tool_use] {block.name}", flush=True)
+
+            elif event_type == "RawContentBlockDeltaEvent":
+                delta = event.delta
+                if delta.type == "text_delta":
+                    print(delta.text, end="", flush=True)
+                elif delta.type == "input_json_delta" and current_tool:
+                    current_tool["input"] += delta.partial_json
+
+            elif event_type == "RawContentBlockStopEvent":
+                if current_tool:
+                    try:
+                        current_tool["input"] = json.loads(current_tool["input"])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                    print(f"  input: {current_tool['input']}", flush=True)
+                    content.append(current_tool)
+                    current_tool = None
+
+        final = stream.get_final_message()
+        for block in final.content:
+            if block.type == "text" and not any(b.get("type") == "text" for b in content):
+                content.append({"type": "text", "text": block.text})
+
+    print(flush=True)
     new_message = {"role": "assistant", "content": content}
     return {
         "messages": state["messages"] + [new_message],
