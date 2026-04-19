@@ -24,3 +24,69 @@ def test_search_schema_has_required_fields():
     assert SEARCH_SCHEMA["name"] == "search"
     assert "query" in SEARCH_SCHEMA["input_schema"]["properties"]
     assert "query" in SEARCH_SCHEMA["input_schema"]["required"]
+
+
+import os
+import tempfile
+from tools.file_reader import read_file, FILE_READER_SCHEMA
+
+
+def test_read_file_returns_contents():
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write("hello world")
+        path = f.name
+    try:
+        assert read_file(path) == "hello world"
+    finally:
+        os.unlink(path)
+
+
+def test_read_file_missing_returns_error():
+    result = read_file("/nonexistent/path/file.txt")
+    assert "Error" in result
+    assert "not found" in result.lower()
+
+
+def test_read_file_too_large_returns_error(tmp_path):
+    big = tmp_path / "big.txt"
+    big.write_text("x" * (11 * 1024))
+    result = read_file(str(big))
+    assert "Error" in result
+    assert "too large" in result.lower()
+
+
+def test_file_reader_schema():
+    assert FILE_READER_SCHEMA["name"] == "read_file"
+    assert "path" in FILE_READER_SCHEMA["input_schema"]["properties"]
+    assert "path" in FILE_READER_SCHEMA["input_schema"]["required"]
+
+
+from tools.list_directory import list_directory, LIST_DIRECTORY_SCHEMA
+
+
+def test_list_directory_returns_entries(tmp_path):
+    (tmp_path / "subdir").mkdir()
+    (tmp_path / "file.txt").write_text("hello")
+    result = list_directory(str(tmp_path))
+    assert "subdir" in result
+    assert "file.txt" in result
+
+
+def test_list_directory_missing_returns_error():
+    result = list_directory("/nonexistent/path")
+    assert "Error" in result
+    assert "not found" in result.lower()
+
+
+def test_list_directory_on_file_returns_error(tmp_path):
+    f = tmp_path / "file.txt"
+    f.write_text("hello")
+    result = list_directory(str(f))
+    assert "Error" in result
+    assert "not a directory" in result.lower()
+
+
+def test_list_directory_schema():
+    assert LIST_DIRECTORY_SCHEMA["name"] == "list_directory"
+    assert "path" in LIST_DIRECTORY_SCHEMA["input_schema"]["properties"]
+    assert "path" in LIST_DIRECTORY_SCHEMA["input_schema"]["required"]
