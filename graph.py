@@ -17,7 +17,8 @@ MAX_ITERATIONS = 10
 
 def agent_node(state: AgentState) -> dict:
     import json
-    print("\nThinking...", flush=True)
+    iteration = state["iterations"] + 1
+    print(f"\n[agent: loop {iteration}/{MAX_ITERATIONS}] deciding next action...", flush=True)
     current_tool_name: str | None = None
     current_tool_input: str = ""
 
@@ -36,7 +37,7 @@ def agent_node(state: AgentState) -> dict:
                 if block.type == "tool_use":
                     current_tool_name = block.name
                     current_tool_input = ""
-                    print(f"\n[tool_use] {block.name}", flush=True)
+                    print(f"\n[tool_call → {block.name}]", flush=True)
 
             elif event_type == "RawContentBlockDeltaEvent":
                 delta = event.delta

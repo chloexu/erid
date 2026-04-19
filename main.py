@@ -31,7 +31,7 @@ def run(query: str) -> None:
             for block in tool_result_msg.get("content", []):
                 if block.get("type") == "tool_result":
                     name = id_to_name.get(block.get("tool_use_id", ""), "tool")
-                    print(f"\n[tool_result] {name}", flush=True)
+                    print(f"\n[tool_result ← {name}] raw response:", flush=True)
                     print(f"{block.get('content', '')}\n", flush=True)
 
 
