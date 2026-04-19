@@ -1,139 +1,45 @@
-import anthropic
 from langgraph.graph import StateGraph, END
 from state import AgentState
-from tools.search import search, SEARCH_SCHEMA
-
-_client = anthropic.Anthropic()
-_verbose = False
-
-
-def configure(verbose: bool = False) -> None:
-    global _verbose
-    _verbose = verbose
-
-
-SYSTEM_PROMPT = (
-    "You are a research assistant. Use the search tool to find information. "
-    "When you have enough information to answer the question, stop calling tools and provide a final answer."
-)
-
-TOOLS_SCHEMA = [SEARCH_SCHEMA]
-
-MAX_ITERATIONS = 10
-
-
-def agent_node(state: AgentState) -> dict:
-    import json
-    iteration = state["iterations"] + 1
-    if _verbose:
-        print(f"\n[agent: loop {iteration}/{MAX_ITERATIONS}] deciding next action...", flush=True)
-    else:
-        print("\nThinking...", flush=True)
-    current_tool_name: str | None = None
-    current_tool_input: str = ""
-
-    with _client.messages.stream(
-        model="claude-sonnet-4-6",
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        tools=TOOLS_SCHEMA,
-        messages=state["messages"],
-    ) as stream:
-        for event in stream:
-            event_type = type(event).__name__
-
-            if event_type == "RawContentBlockStartEvent":
-                block = event.content_block
-                if block.type == "tool_use":
-                    current_tool_name = block.name
-                    current_tool_input = ""
-                    if _verbose:
-                        print(f"\n[tool_call → {block.name}]", flush=True)
-                    else:
-                        print(f"\n[tool_use] {block.name}", flush=True)
-
-            elif event_type == "RawContentBlockDeltaEvent":
-                delta = event.delta
-                if delta.type == "text_delta":
-                    print(delta.text, end="", flush=True)
-                elif delta.type == "input_json_delta":
-                    current_tool_input += delta.partial_json
-
-            elif event_type in ("RawContentBlockStopEvent", "ParsedContentBlockStopEvent"):
-                if current_tool_name is not None:
-                    try:
-                        parsed = json.loads(current_tool_input)
-                    except (json.JSONDecodeError, TypeError):
-                        parsed = current_tool_input
-                    print(f"  input: {parsed}", flush=True)
-                    current_tool_name = None
-                    current_tool_input = ""
-
-        # Use final message for content — more reliable than event accumulation
-        final = stream.get_final_message()
-
-    print(flush=True)
-    content = []
-    for block in final.content:
-        if block.type == "text":
-            content.append({"type": "text", "text": block.text})
-        elif block.type == "tool_use":
-            content.append({
-                "type": "tool_use",
-                "id": block.id,
-                "name": block.name,
-                "input": block.input,
-            })
-
-    new_message = {"role": "assistant", "content": content}
-    return {
-        "messages": state["messages"] + [new_message],
-        "iterations": state["iterations"] + 1,
-    }
-
-
-def tool_node(state: AgentState) -> dict:
-    last_message = state["messages"][-1]
-    tool_results = []
-    for block in last_message["content"]:
-        if block.get("type") == "tool_use":
-            result = dispatch_tool(block["name"], block["input"])
-            tool_results.append({
-                "type": "tool_result",
-                "tool_use_id": block["id"],
-                "content": result,
-            })
-    tool_message = {"role": "user", "content": tool_results}
-    return {"messages": state["messages"] + [tool_message]}
-
-
-def dispatch_tool(name: str, inputs: dict) -> str:
-    if name == "search":
-        return search(inputs["query"])
-    return f"Unknown tool: {name}"
-
-
-def should_continue(state: AgentState) -> str:
-    if state["iterations"] >= MAX_ITERATIONS:
-        return "end"
-    last_message = state["messages"][-1]
-    if last_message.get("role") != "assistant":
-        return "end"
-    for block in last_message.get("content", []):
-        if isinstance(block, dict) and block.get("type") == "tool_use":
-            return "tools"
-    return "end"
+from agents.supervisor import supervisor_node
+from agents.researcher import researcher_agent_node, researcher_tool_node, researcher_should_continue
+from agents.summarizer import summarizer_node
+from agents.decision import decision_agent_node, decision_tool_node, decision_should_continue
 
 
 def build_graph(checkpointer=None):
     graph = StateGraph(AgentState)
-    graph.add_node("agent", agent_node)
-    graph.add_node("tools", tool_node)
-    graph.set_entry_point("agent")
+
+    graph.add_node("supervisor", supervisor_node)
+    graph.add_node("researcher", researcher_agent_node)
+    graph.add_node("researcher_tools", researcher_tool_node)
+    graph.add_node("summarizer", summarizer_node)
+    graph.add_node("decision", decision_agent_node)
+    graph.add_node("decision_tools", decision_tool_node)
+
+    graph.set_entry_point("supervisor")
+
+    # Supervisor routes: both research and codebase go to researcher
     graph.add_conditional_edges(
-        "agent",
-        should_continue,
-        {"tools": "tools", "end": END},
+        "supervisor",
+        lambda state: state["route"],
+        {"research": "researcher", "codebase": "researcher", "decide": "decision"},
     )
-    graph.add_edge("tools", "agent")
+
+    # Researcher loop -> summarizer
+    graph.add_conditional_edges(
+        "researcher",
+        researcher_should_continue,
+        {"researcher_tools": "researcher_tools", "summarize": "summarizer"},
+    )
+    graph.add_edge("researcher_tools", "researcher")
+    graph.add_edge("summarizer", END)
+
+    # Decision loop -> end (decision outputs answer directly via streaming)
+    graph.add_conditional_edges(
+        "decision",
+        decision_should_continue,
+        {"decision_tools": "decision_tools", "end": END},
+    )
+    graph.add_edge("decision_tools", "decision")
+
     return graph.compile(checkpointer=checkpointer)
