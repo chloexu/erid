@@ -36,8 +36,8 @@ The more you feed it, the more it sounds like you.
 cp .env.example .env
 # Add ANTHROPIC_API_KEY and TAVILY_API_KEY
 
-# Create a virtual environment (ARM64 on Apple Silicon)
-arch -arm64 /Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m venv .venv
+# Create a virtual environment
+/Library/Frameworks/Python.framework/Versions/3.14/bin/python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
