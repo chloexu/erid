@@ -4,6 +4,13 @@ from state import AgentState
 from tools.search import search, SEARCH_SCHEMA
 
 _client = anthropic.Anthropic()
+_verbose = False
+
+
+def configure(verbose: bool = False) -> None:
+    global _verbose
+    _verbose = verbose
+
 
 SYSTEM_PROMPT = (
     "You are a research assistant. Use the search tool to find information. "
@@ -18,7 +25,10 @@ MAX_ITERATIONS = 10
 def agent_node(state: AgentState) -> dict:
     import json
     iteration = state["iterations"] + 1
-    print(f"\n[agent: loop {iteration}/{MAX_ITERATIONS}] deciding next action...", flush=True)
+    if _verbose:
+        print(f"\n[agent: loop {iteration}/{MAX_ITERATIONS}] deciding next action...", flush=True)
+    else:
+        print("\nThinking...", flush=True)
     current_tool_name: str | None = None
     current_tool_input: str = ""
 
@@ -37,7 +47,10 @@ def agent_node(state: AgentState) -> dict:
                 if block.type == "tool_use":
                     current_tool_name = block.name
                     current_tool_input = ""
-                    print(f"\n[tool_call → {block.name}]", flush=True)
+                    if _verbose:
+                        print(f"\n[tool_call → {block.name}]", flush=True)
+                    else:
+                        print(f"\n[tool_use] {block.name}", flush=True)
 
             elif event_type == "RawContentBlockDeltaEvent":
                 delta = event.delta
