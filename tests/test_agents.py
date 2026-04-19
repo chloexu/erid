@@ -58,3 +58,76 @@ def test_supervisor_defaults_to_research_on_unknown_route():
         mock_client.messages.stream.return_value = _mock_stream(text)
         result = supervisor_node(_base_state("random query"))
     assert result["route"] == "research"
+
+
+# ── Researcher ─────────────────────────────────────────────────────────────────
+
+from agents.researcher import researcher_agent_node, researcher_tool_node, researcher_should_continue
+
+
+def _research_state(query: str = "What is LangGraph?", route: str = "research") -> AgentState:
+    return {
+        "messages": [{"role": "user", "content": query}],
+        "query": query,
+        "iterations": 0,
+        "route": route,
+        "answer": "",
+    }
+
+
+def test_researcher_agent_node_returns_updated_messages():
+    with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Done."}]):
+        state = _research_state()
+        result = researcher_agent_node(state)
+    assert len(result["messages"]) == len(state["messages"]) + 1
+    assert result["messages"][-1]["role"] == "assistant"
+    assert result["iterations"] == 1
+
+
+def test_researcher_agent_node_codebase_route():
+    with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Found it."}]):
+        state = _research_state(query="How does auth work?", route="codebase")
+        result = researcher_agent_node(state)
+    assert result["iterations"] == 1
+
+
+def test_researcher_should_continue_tools():
+    state = _research_state()
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": "x", "name": "search", "input": {}}],
+    })
+    assert researcher_should_continue(state) == "researcher_tools"
+
+
+def test_researcher_should_continue_summarize():
+    state = _research_state()
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "text", "text": "Here is what I found."}],
+    })
+    assert researcher_should_continue(state) == "summarize"
+
+
+def test_researcher_should_continue_max_iterations():
+    state = _research_state()
+    state["iterations"] = 10
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": "x", "name": "search", "input": {}}],
+    })
+    assert researcher_should_continue(state) == "summarize"
+
+
+def test_researcher_tool_node_executes_search():
+    state = _research_state()
+    state["messages"].append({
+        "role": "assistant",
+        "content": [{"type": "tool_use", "id": "tu_1", "name": "search", "input": {"query": "LangGraph"}}],
+    })
+    with patch("agents.researcher.search", return_value="Search results here"):
+        result = researcher_tool_node(state)
+    last = result["messages"][-1]
+    assert last["role"] == "user"
+    assert last["content"][0]["type"] == "tool_result"
+    assert last["content"][0]["content"] == "Search results here"
