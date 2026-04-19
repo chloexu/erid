@@ -18,8 +18,8 @@ MAX_ITERATIONS = 10
 def agent_node(state: AgentState) -> dict:
     import json
     print("\nThinking...", flush=True)
-    content = []
-    current_tool: dict | None = None
+    current_tool_name: str | None = None
+    current_tool_input: str = ""
 
     with _client.messages.stream(
         model="claude-sonnet-4-6",
@@ -34,32 +34,43 @@ def agent_node(state: AgentState) -> dict:
             if event_type == "RawContentBlockStartEvent":
                 block = event.content_block
                 if block.type == "tool_use":
-                    current_tool = {"type": "tool_use", "id": block.id, "name": block.name, "input": ""}
+                    current_tool_name = block.name
+                    current_tool_input = ""
                     print(f"\n[tool_use] {block.name}", flush=True)
 
             elif event_type == "RawContentBlockDeltaEvent":
                 delta = event.delta
                 if delta.type == "text_delta":
                     print(delta.text, end="", flush=True)
-                elif delta.type == "input_json_delta" and current_tool:
-                    current_tool["input"] += delta.partial_json
+                elif delta.type == "input_json_delta":
+                    current_tool_input += delta.partial_json
 
-            elif event_type == "RawContentBlockStopEvent":
-                if current_tool:
+            elif event_type in ("RawContentBlockStopEvent", "ParsedContentBlockStopEvent"):
+                if current_tool_name is not None:
                     try:
-                        current_tool["input"] = json.loads(current_tool["input"])
+                        parsed = json.loads(current_tool_input)
                     except (json.JSONDecodeError, TypeError):
-                        pass
-                    print(f"  input: {current_tool['input']}", flush=True)
-                    content.append(current_tool)
-                    current_tool = None
+                        parsed = current_tool_input
+                    print(f"  input: {parsed}", flush=True)
+                    current_tool_name = None
+                    current_tool_input = ""
 
+        # Use final message for content — more reliable than event accumulation
         final = stream.get_final_message()
-        for block in final.content:
-            if block.type == "text" and not any(b.get("type") == "text" for b in content):
-                content.append({"type": "text", "text": block.text})
 
     print(flush=True)
+    content = []
+    for block in final.content:
+        if block.type == "text":
+            content.append({"type": "text", "text": block.text})
+        elif block.type == "tool_use":
+            content.append({
+                "type": "tool_use",
+                "id": block.id,
+                "name": block.name,
+                "input": block.input,
+            })
+
     new_message = {"role": "assistant", "content": content}
     return {
         "messages": state["messages"] + [new_message],

@@ -1,9 +1,10 @@
 import sys
 from dotenv import load_dotenv
+
+load_dotenv()  # must run before graph import — client is instantiated at module load time
+
 from graph import build_graph
 from state import AgentState
-
-load_dotenv()
 
 
 def run(query: str) -> None:
