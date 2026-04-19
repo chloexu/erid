@@ -19,15 +19,20 @@ FILE_READER_SCHEMA = {
 
 
 def read_file(path: str) -> str:
-    if not os.path.exists(path):
-        return f"Error: File not found: {path}"
-    if not os.path.isfile(path):
-        return f"Error: Not a file: {path}"
-    size = os.path.getsize(path)
-    if size > MAX_BYTES:
-        return f"Error: File too large ({size} bytes, max {MAX_BYTES})."
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return f.read()
-    except Exception as e:
+            content = f.read(MAX_BYTES + 1)
+        if len(content) > MAX_BYTES:
+            size = os.path.getsize(path)
+            return f"Error: File too large ({size} bytes, max {MAX_BYTES})."
+        return content
+    except FileNotFoundError:
+        return f"Error: File not found: {path}"
+    except IsADirectoryError:
+        return f"Error: Not a file: {path}"
+    except PermissionError:
+        return f"Error: Permission denied: {path}"
+    except UnicodeDecodeError:
+        return f"Error: File is not valid UTF-8: {path}"
+    except OSError as e:
         return f"Error reading file: {e}"

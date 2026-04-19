@@ -1,5 +1,7 @@
 from unittest.mock import patch, MagicMock
 from tools.search import search, SEARCH_SCHEMA
+from tools.file_reader import read_file, FILE_READER_SCHEMA
+from tools.list_directory import list_directory, LIST_DIRECTORY_SCHEMA
 
 
 def test_search_returns_formatted_string():
@@ -26,19 +28,10 @@ def test_search_schema_has_required_fields():
     assert "query" in SEARCH_SCHEMA["input_schema"]["required"]
 
 
-import os
-import tempfile
-from tools.file_reader import read_file, FILE_READER_SCHEMA
-
-
-def test_read_file_returns_contents():
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write("hello world")
-        path = f.name
-    try:
-        assert read_file(path) == "hello world"
-    finally:
-        os.unlink(path)
+def test_read_file_returns_contents(tmp_path):
+    f = tmp_path / "hello.txt"
+    f.write_text("hello world")
+    assert read_file(str(f)) == "hello world"
 
 
 def test_read_file_missing_returns_error():
@@ -61,15 +54,17 @@ def test_file_reader_schema():
     assert "path" in FILE_READER_SCHEMA["input_schema"]["required"]
 
 
-from tools.list_directory import list_directory, LIST_DIRECTORY_SCHEMA
-
-
 def test_list_directory_returns_entries(tmp_path):
     (tmp_path / "subdir").mkdir()
     (tmp_path / "file.txt").write_text("hello")
     result = list_directory(str(tmp_path))
     assert "subdir" in result
     assert "file.txt" in result
+
+
+def test_list_directory_empty(tmp_path):
+    result = list_directory(str(tmp_path))
+    assert "(empty)" in result
 
 
 def test_list_directory_missing_returns_error():
