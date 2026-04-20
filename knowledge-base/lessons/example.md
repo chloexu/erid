@@ -1,7 +1,6 @@
 # Lessons Learned: Microservices Too Early
 
 **Date:** 2025-11-01
-**Project:** radius-micro-services
 
 ## What happened
 Split a monolith into microservices before traffic justified it. Spent 3 weeks on service discovery, shared auth, and distributed tracing before writing any product features.

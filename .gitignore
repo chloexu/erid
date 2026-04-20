@@ -5,3 +5,7 @@ __pycache__/
 *.pyo
 .pytest_cache/
 memory/*.db
+
+# Personal knowledge base — only keep example scaffolds
+knowledge-base/**/*.md
+!knowledge-base/**/example.md
