@@ -14,12 +14,12 @@ A ReAct loop: LangGraph StateGraph, Anthropic SDK direct, Tavily web search, 10-
 
 ---
 
-## Phase 2 — Tools, Orchestration & Agent Identity
+## Phase 2 — Tools, Orchestration & Agent Identity ✓
 
 Personal research + decision assistant. Supervisor routes to three paths: web research, codebase exploration, decision support. Personal knowledge base (markdown). Streaming extended to all LLM calls.
 
 - Spec: `specs/2026-04-19-phase2-redesign.md`
-- Plan: *to be written after spec review*
+- Plan: `plans/2026-04-19-erid-phase2.md`
 
 ---
 

@@ -92,7 +92,7 @@ python main.py "What is LangGraph?" -v
 | Phase | Focus | Status |
 |-------|-------|--------|
 | 1 | ReAct loop + streaming | ✓ Complete |
-| 2 | Tools, orchestration, personal KB | In design |
+| 2 | Tools, orchestration, personal KB | ✓ Complete |
 | 3 | Human-in-the-loop | Planned |
 | 4 | Observability | Planned |
 | 5 | Evals | Planned |
