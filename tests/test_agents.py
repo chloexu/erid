@@ -30,34 +30,80 @@ def _mock_stream(text: str):
 
 def test_supervisor_routes_research():
     text = "Reasoning: web lookup needed\nRoute: research"
-    with patch("agents.supervisor._client") as mock_client:
-        mock_client.messages.stream.return_value = _mock_stream(text)
-        result = supervisor_node(_base_state("What is LangGraph?"))
+    with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            result = supervisor_node(_base_state("What is LangGraph?"))
     assert result["route"] == "research"
 
 
 def test_supervisor_routes_codebase():
     text = "Reasoning: exploring local code\nRoute: codebase"
-    with patch("agents.supervisor._client") as mock_client:
-        mock_client.messages.stream.return_value = _mock_stream(text)
-        result = supervisor_node(_base_state("How does auth work in chefs-hub?"))
+    with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            result = supervisor_node(_base_state("How does auth work in chefs-hub?"))
     assert result["route"] == "codebase"
 
 
 def test_supervisor_routes_decide():
     text = "Reasoning: decision needed\nRoute: decide"
-    with patch("agents.supervisor._client") as mock_client:
-        mock_client.messages.stream.return_value = _mock_stream(text)
-        result = supervisor_node(_base_state("Should I use FastAPI or Django?"))
+    with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            result = supervisor_node(_base_state("Should I use FastAPI or Django?"))
     assert result["route"] == "decide"
+
+
+def test_supervisor_routes_knowledge_base():
+    text = "Reasoning: querying personal KB\nRoute: knowledge_base"
+    with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            result = supervisor_node(_base_state("What lessons have I learned about microservices?"))
+    assert result["route"] == "knowledge_base"
 
 
 def test_supervisor_defaults_to_research_on_unknown_route():
     text = "Reasoning: unclear\nRoute: something_else"
-    with patch("agents.supervisor._client") as mock_client:
-        mock_client.messages.stream.return_value = _mock_stream(text)
-        result = supervisor_node(_base_state("random query"))
+    with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            result = supervisor_node(_base_state("random query"))
     assert result["route"] == "research"
+
+
+def test_supervisor_asks_clarification_when_ambiguous():
+    text = "Reasoning: exploring local code\nRoute: codebase"
+    with patch("agents.supervisor._check_clarity", side_effect=[(False, "Which project?"), (True, "none")]):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            with patch("builtins.input", return_value="chefs-hub"):
+                result = supervisor_node(_base_state("how does auth work?"))
+    assert result["route"] == "codebase"
+    assert "Clarifying question: Which project?" in result["query"]
+    assert "Answer: chefs-hub" in result["query"]
+
+
+def test_supervisor_enriched_query_passed_to_messages():
+    text = "Reasoning: exploring local code\nRoute: codebase"
+    with patch("agents.supervisor._check_clarity", side_effect=[(False, "Which project?"), (True, "none")]):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            with patch("builtins.input", return_value="chefs-hub"):
+                result = supervisor_node(_base_state("how does auth work?"))
+    assert result["messages"] == [{"role": "user", "content": result["query"]}]
+
+
+def test_supervisor_proceeds_after_max_clarifications():
+    text = "Reasoning: web lookup needed\nRoute: research"
+    with patch("agents.supervisor._check_clarity", return_value=(False, "Be more specific?")):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            with patch("builtins.input", return_value="still vague"):
+                result = supervisor_node(_base_state("explain things"))
+    assert result["route"] == "research"
+    assert result["query"].count("Clarifying question:") == 2
 
 
 # ── Researcher ─────────────────────────────────────────────────────────────────
@@ -87,6 +133,13 @@ def test_researcher_agent_node_returns_updated_messages():
 def test_researcher_agent_node_codebase_route():
     with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Found it."}]):
         state = _research_state(query="How does auth work?", route="codebase")
+        result = researcher_agent_node(state)
+    assert result["iterations"] == 1
+
+
+def test_researcher_agent_node_knowledge_base_route():
+    with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Your lessons say..."}]):
+        state = _research_state(query="What lessons have I learned?", route="knowledge_base")
         result = researcher_agent_node(state)
     assert result["iterations"] == 1
 

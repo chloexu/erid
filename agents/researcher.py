@@ -18,6 +18,12 @@ CODEBASE_SYSTEM = (
     "When you have enough context to answer the question, stop calling tools and summarize what you found."
 )
 
+KB_SYSTEM = (
+    "You are a personal knowledge base assistant. Use list_directory on 'knowledge-base/' to see what's available, "
+    "then read_file to read relevant files (decisions, lessons, preferences, project notes). "
+    "When you have read the relevant files, stop calling tools and summarize what you found."
+)
+
 RESEARCHER_TOOLS = [SEARCH_SCHEMA, FILE_READER_SCHEMA, LIST_DIRECTORY_SCHEMA]
 
 MAX_ITERATIONS = 10
@@ -34,7 +40,13 @@ def _dispatch(name: str, inputs: dict) -> str:
 
 
 def researcher_agent_node(state) -> dict:
-    system = CODEBASE_SYSTEM if state.get("route") == "codebase" else RESEARCH_SYSTEM
+    route = state.get("route")
+    if route == "codebase":
+        system = CODEBASE_SYSTEM
+    elif route == "knowledge_base":
+        system = KB_SYSTEM
+    else:
+        system = RESEARCH_SYSTEM
     content = stream_agent_turn(
         _client,
         system=system,

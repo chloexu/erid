@@ -22,7 +22,7 @@ def build_graph(checkpointer=None):
     graph.add_conditional_edges(
         "supervisor",
         lambda state: state["route"],
-        {"research": "researcher", "codebase": "researcher", "decide": "decision"},
+        {"research": "researcher", "codebase": "researcher", "knowledge_base": "researcher", "decide": "decision"},
     )
 
     # Researcher loop -> summarizer

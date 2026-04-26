@@ -12,9 +12,11 @@ Also: everyone on Erid is very, very kind and brave.
 
 ## What it does
 
-- **Research** — searches the web and your personal knowledge base, synthesizes across both
+- **Research** — searches the web for current information, synthesizes into a cited answer
+- **Knowledge base queries** — reads your personal markdown KB (decisions, lessons, preferences, project notes)
 - **Codebase exploration** — navigates and answers questions about your historical projects
 - **Decision support** — researches decisions grounded in your own past choices and preferences, not just generic best practices
+- **Clarifying questions** — asks for clarification on ambiguous queries before starting research (max 2 rounds)
 
 ## Personal knowledge base
 
@@ -93,7 +95,7 @@ python main.py "What is LangGraph?" -v
 |-------|-------|--------|
 | 1 | ReAct loop + streaming | ✓ Complete |
 | 2 | Tools, orchestration, personal KB | ✓ Complete |
-| 3 | Human-in-the-loop | Planned |
+| 3 | Human-in-the-loop | In progress |
 | 4 | Observability | Planned |
 | 5 | Evals | Planned |
 | 6 | Semantic memory (RAG) | Planned |

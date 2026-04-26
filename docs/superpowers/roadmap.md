@@ -16,21 +16,20 @@ A ReAct loop: LangGraph StateGraph, Anthropic SDK direct, Tavily web search, 10-
 
 ## Phase 2 — Tools, Orchestration & Agent Identity ✓
 
-Personal research + decision assistant. Supervisor routes to three paths: web research, codebase exploration, decision support. Personal knowledge base (markdown). Streaming extended to all LLM calls.
+Personal research + decision assistant. Supervisor routes to four paths: web research, codebase exploration, knowledge base queries, and decision support. Personal knowledge base (markdown). Streaming extended to all LLM calls.
 
 - Spec: `specs/2026-04-19-phase2-redesign.md`
 - Plan: `plans/2026-04-19-erid-phase2.md`
 
 ---
 
-## Phase 3 — Human-in-the-loop
+## Phase 3 — Human-in-the-loop ✓ (in progress)
 
-Agent pauses before writing to the knowledge base and asks for approval. User can approve, edit, or abort. Teaches: LangGraph interrupt patterns, building collaborative rather than fully autonomous agents.
+Supervisor pauses on ambiguous queries and asks the user to clarify before routing. Enriched query (original + clarifying Q&A) is passed to all downstream agents. Max 2 clarification rounds before proceeding. Uses Haiku for the lightweight clarity check, Sonnet for classification.
 
-Natural trigger: KB write from Phase 2's conversational enrichment needs approval before persisting.
+Teaches: when to interrupt vs. proceed, structured human-in-the-loop without a checkpointer, cheap pre-flight LLM calls.
 
-- Spec: *to be written*
-- Plan: *to be written*
+Next: additional HITL moments (decision framing confirmation, file access boundaries).
 
 ---
 
