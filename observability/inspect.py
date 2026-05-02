@@ -64,8 +64,9 @@ def inspect_run(run_id: str, db_path: Path) -> None:
                 if event["input_tokens"] is not None
                 else ""
             )
-            cost_part = f", ${event['cost_usd']:.3f}" if event["cost_usd"] is not None else ""
-            print(f"{prefix}  [{name}] done  ({dur}, {tok}{cost_part})")
+            cost_part = f"${event['cost_usd']:.3f}" if event["cost_usd"] is not None else ""
+            parts = [p for p in [dur, tok, cost_part] if p]
+            print(f"{prefix}  [{name}] done  ({', '.join(parts)})")
 
         elif etype == "tool_call":
             detail = json.loads(event["detail"]) if event["detail"] else {}
