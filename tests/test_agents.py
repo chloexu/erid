@@ -277,3 +277,84 @@ def test_decision_tool_node_executes_read_file():
         result = decision_tool_node(state)
     last = result["messages"][-1]
     assert last["content"][0]["content"] == "Prefer FastAPI."
+
+
+# ── Streaming tracer instrumentation ────────────────────────────────────────
+
+from agents.streaming import stream_agent_turn, stream_text_turn
+
+
+def _mock_agent_stream(text="result", input_tokens=500, output_tokens=100):
+    mock = MagicMock()
+    mock.__enter__ = MagicMock(return_value=mock)
+    mock.__exit__ = MagicMock(return_value=False)
+    mock.__iter__ = MagicMock(return_value=iter([]))
+    final = MagicMock()
+    final.content = [MagicMock(type="text", text=text, id=None)]
+    final.usage.input_tokens = input_tokens
+    final.usage.output_tokens = output_tokens
+    mock.get_final_message = MagicMock(return_value=final)
+    return mock
+
+
+def _mock_text_stream(text="result", input_tokens=200, output_tokens=80):
+    mock = MagicMock()
+    mock.__enter__ = MagicMock(return_value=mock)
+    mock.__exit__ = MagicMock(return_value=False)
+    mock.text_stream = iter([text])
+    final = MagicMock()
+    final.content = [MagicMock(text=text)]
+    final.usage.input_tokens = input_tokens
+    final.usage.output_tokens = output_tokens
+    mock.get_final_message = MagicMock(return_value=final)
+    return mock
+
+
+def test_stream_agent_turn_calls_record_llm_call():
+    tracer = MagicMock()
+    client = MagicMock()
+    client.messages.stream.return_value = _mock_agent_stream(input_tokens=500, output_tokens=100)
+
+    stream_agent_turn(
+        client,
+        system="sys",
+        tools=[],
+        messages=[],
+        label="researcher",
+        tracer=tracer,
+    )
+
+    tracer.record_llm_call.assert_called_once()
+    args, kwargs = tracer.record_llm_call.call_args
+    all_args = list(args) + list(kwargs.values())
+    assert "researcher" in all_args
+    assert 500 in all_args
+    assert 100 in all_args
+
+
+def test_stream_text_turn_calls_record_llm_call():
+    tracer = MagicMock()
+    client = MagicMock()
+    client.messages.stream.return_value = _mock_text_stream(input_tokens=200, output_tokens=80)
+
+    stream_text_turn(
+        client,
+        system="sys",
+        messages=[],
+        label="summarizer",
+        tracer=tracer,
+    )
+
+    tracer.record_llm_call.assert_called_once()
+    args, kwargs = tracer.record_llm_call.call_args
+    all_args = list(args) + list(kwargs.values())
+    assert "summarizer" in all_args
+    assert 200 in all_args
+    assert 80 in all_args
+
+
+def test_stream_agent_turn_no_tracer_does_not_crash():
+    client = MagicMock()
+    client.messages.stream.return_value = _mock_agent_stream()
+    # No tracer passed — should use NullTracer internally, no error
+    stream_agent_turn(client, system="sys", tools=[], messages=[], label="test")
