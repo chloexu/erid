@@ -9,12 +9,16 @@ load_dotenv()  # must run before graph import — client is instantiated at modu
 from graph import build_graph
 from observability import get_tracer, set_tracer
 from observability.inspect import inspect_run
-from observability.tracer import DB_PATH, Tracer
+from observability.tracer import DB_PATH, NullTracer, Tracer
 from state import AgentState
 
 
 def run(query: str) -> None:
-    set_tracer(Tracer())
+    try:
+        set_tracer(Tracer())
+    except Exception as e:
+        print(f"[tracer] warning: could not init tracer: {e}", file=sys.stderr)
+        set_tracer(NullTracer())
     tracer = get_tracer()
     run_id = str(uuid.uuid4())[:8]
     tracer.start_run(run_id, query)
