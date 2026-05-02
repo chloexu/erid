@@ -21,7 +21,7 @@ Every Erid run writes a structured trace to a local SQLite database. A `--inspec
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | TEXT PK | UUID4 |
-| `timestamp` | TEXT | ISO8601 |
+| `timestamp` | TEXT | ISO8601 with milliseconds, e.g. `2026-05-02T14:32:01.123Z` |
 | `query` | TEXT | original query (post-clarification if edited) |
 | `route` | TEXT | `research \| codebase \| knowledge_base \| decide` |
 | `total_input_tokens` | INTEGER | sum across all LLM calls |
@@ -38,7 +38,7 @@ Every Erid run writes a structured trace to a local SQLite database. A `--inspec
 | `seq` | INTEGER | ordering within run |
 | `event_type` | TEXT | `node_start \| node_end \| tool_call \| clarification \| routing` |
 | `name` | TEXT | node label or tool name |
-| `timestamp` | TEXT | ISO8601 |
+| `timestamp` | TEXT | ISO8601 with milliseconds, e.g. `2026-05-02T14:32:01.123Z` |
 | `duration_ms` | INTEGER | null for `node_start`, `clarification`, `routing` |
 | `input_tokens` | INTEGER | null except `node_end` |
 | `output_tokens` | INTEGER | null except `node_end` |
@@ -163,6 +163,15 @@ Summary:
 - If `~/.erid/` doesn't exist, create it on first run
 - If the DB write fails, log a warning to stderr but do not crash the run — tracing is best-effort
 - `--inspect` on unknown run ID prints: `No run found with ID: <id>`
+
+---
+
+## Known Limitations
+
+- **One run at a time:** The singleton Tracer assumes one concurrent run. A future batch eval runner would need per-run tracer instances passed explicitly.
+- **No tool output stored:** Only tool inputs are stored in `detail`. Tool outputs are omitted to keep DB size manageable. Phase 5 can revisit if eval debugging requires it.
+- **Multiple `[researcher] start/done` pairs:** The researcher loops (LLM → tools → LLM → ...), so the timeline shows one `start/done` pair per loop iteration, not per session. This is accurate and expected.
+- **Hardcoded pricing:** Model pricing is hardcoded. Must be updated manually when Anthropic changes rates.
 
 ---
 
