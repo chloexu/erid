@@ -1,5 +1,6 @@
 import anthropic
 from agents.streaming import stream_text_turn
+from observability import get_tracer
 
 _client = anthropic.Anthropic()
 
@@ -12,6 +13,8 @@ SUMMARIZER_SYSTEM = (
 
 
 def summarizer_node(state) -> dict:
+    tracer = get_tracer()
+    tracer.record_node_start("summarizer")
     summary_prompt = (
         f"Original question: {state['query']}\n\n"
         "Based on the research above, provide a clear, cited answer."
@@ -22,5 +25,6 @@ def summarizer_node(state) -> dict:
         system=SUMMARIZER_SYSTEM,
         messages=messages,
         label="summarizer",
+        tracer=tracer,
     )
     return {"answer": answer}

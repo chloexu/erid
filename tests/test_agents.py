@@ -298,15 +298,42 @@ def _summarizer_state(research_text: str) -> AgentState:
 
 
 def test_summarizer_returns_answer():
-    with patch("agents.summarizer.stream_text_turn", return_value="LangGraph is a framework. [Source: example.com]"):
-        result = summarizer_node(_summarizer_state("LangGraph is a state graph library."))
+    with patch("agents.summarizer.get_tracer"):
+        with patch("agents.summarizer.stream_text_turn", return_value="LangGraph is a framework. [Source: example.com]"):
+            result = summarizer_node(_summarizer_state("LangGraph is a state graph library."))
     assert result["answer"] == "LangGraph is a framework. [Source: example.com]"
 
 
 def test_summarizer_answer_is_string():
-    with patch("agents.summarizer.stream_text_turn", return_value="Some answer."):
-        result = summarizer_node(_summarizer_state("context"))
+    with patch("agents.summarizer.get_tracer"):
+        with patch("agents.summarizer.stream_text_turn", return_value="Some answer."):
+            result = summarizer_node(_summarizer_state("context"))
     assert isinstance(result["answer"], str)
+
+
+def test_summarizer_node_records_node_start():
+    """Verify that summarizer_node records node_start via tracer."""
+    with patch("agents.summarizer.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        with patch("agents.summarizer.stream_text_turn", return_value="Summary text"):
+            result = summarizer_node(_summarizer_state("research"))
+
+    mock_tracer.record_node_start.assert_called_once_with("summarizer")
+
+
+def test_summarizer_node_passes_tracer_to_stream():
+    """Verify that summarizer_node passes tracer to stream_text_turn."""
+    with patch("agents.summarizer.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        with patch("agents.summarizer.stream_text_turn", return_value="Summary") as mock_stream:
+            result = summarizer_node(_summarizer_state("research"))
+
+    # Verify stream_text_turn was called with tracer=mock_tracer
+    mock_stream.assert_called_once()
+    call_kwargs = mock_stream.call_args[1]
+    assert call_kwargs.get("tracer") is mock_tracer
 
 
 # ── Decision ───────────────────────────────────────────────────────────────────
@@ -325,11 +352,69 @@ def _decision_state(query: str = "FastAPI vs Django?") -> AgentState:
 
 
 def test_decision_agent_node_returns_updated_messages():
-    with patch("agents.decision.stream_agent_turn", return_value=[{"type": "text", "text": "## Decision\nUse FastAPI."}]):
-        result = decision_agent_node(_decision_state())
+    with patch("agents.decision.get_tracer"):
+        with patch("agents.decision.stream_agent_turn", return_value=[{"type": "text", "text": "## Decision\nUse FastAPI."}]):
+            result = decision_agent_node(_decision_state())
     assert len(result["messages"]) == 2
     assert result["messages"][-1]["role"] == "assistant"
     assert result["iterations"] == 1
+
+
+def test_decision_agent_node_records_node_start():
+    """Verify that decision_agent_node records node_start via tracer."""
+    with patch("agents.decision.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        with patch("agents.decision.stream_agent_turn", return_value=[{"type": "text", "text": "My recommendation is A"}]):
+            result = decision_agent_node(_decision_state())
+
+    mock_tracer.record_node_start.assert_called_once_with("decision")
+
+
+def test_decision_agent_node_passes_tracer_to_stream():
+    """Verify that decision_agent_node passes tracer to stream_agent_turn."""
+    with patch("agents.decision.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        with patch("agents.decision.stream_agent_turn", return_value=[{"type": "text", "text": "Done"}]) as mock_stream:
+            result = decision_agent_node(_decision_state())
+
+    # Verify stream_agent_turn was called with tracer=mock_tracer
+    mock_stream.assert_called_once()
+    call_kwargs = mock_stream.call_args[1]
+    assert call_kwargs.get("tracer") is mock_tracer
+
+
+def test_decision_agent_node_sets_answer_on_final_turn():
+    """Verify that decision_agent_node sets answer when final turn (no tool calls)."""
+    with patch("agents.decision.get_tracer"):
+        with patch("agents.decision.stream_agent_turn", return_value=[{"type": "text", "text": "My recommendation is A"}]):
+            result = decision_agent_node(_decision_state())
+
+    assert "answer" in result
+    assert result["answer"] == "My recommendation is A"
+
+
+def test_decision_agent_node_no_answer_when_tool_calls():
+    """Verify that decision_agent_node does NOT set answer when there are tool calls."""
+    with patch("agents.decision.get_tracer"):
+        with patch("agents.decision.stream_agent_turn", return_value=[{"type": "tool_use", "id": "x", "name": "search", "input": {}}]):
+            result = decision_agent_node(_decision_state())
+
+    assert "answer" not in result or result.get("answer") == ""
+
+
+def test_decision_agent_node_answer_from_multiple_text_blocks():
+    """Verify that decision_agent_node concatenates multiple text blocks in answer."""
+    with patch("agents.decision.get_tracer"):
+        with patch("agents.decision.stream_agent_turn", return_value=[
+            {"type": "text", "text": "First part."},
+            {"type": "text", "text": "Second part."}
+        ]):
+            result = decision_agent_node(_decision_state())
+
+    assert "answer" in result
+    assert result["answer"] == "First part. Second part."
 
 
 def test_decision_should_continue_tools():
@@ -366,10 +451,53 @@ def test_decision_tool_node_executes_read_file():
         "role": "assistant",
         "content": [{"type": "tool_use", "id": "tu_1", "name": "read_file", "input": {"path": "kb/prefs.md"}}],
     })
-    with patch("agents.decision.read_file", return_value="Prefer FastAPI."):
-        result = decision_tool_node(state)
+    with patch("agents.decision.get_tracer"):
+        with patch("agents.decision.read_file", return_value="Prefer FastAPI."):
+            result = decision_tool_node(state)
     last = result["messages"][-1]
     assert last["content"][0]["content"] == "Prefer FastAPI."
+
+
+def test_decision_tool_node_records_tool_call():
+    """Verify that decision_tool_node records tool_call via tracer."""
+    with patch("agents.decision.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        state = _decision_state()
+        state["messages"].append({
+            "role": "assistant",
+            "content": [{"type": "tool_use", "id": "tu_1", "name": "search", "input": {"query": "FastAPI"}}],
+        })
+        with patch("agents.decision._dispatch", return_value="search results"):
+            decision_tool_node(state)
+
+    # Verify record_tool_call was called with name="search" and denied=False
+    mock_tracer.record_tool_call.assert_called_once()
+    call_kwargs = mock_tracer.record_tool_call.call_args[1]
+    assert call_kwargs.get("name") == "search"
+    assert call_kwargs.get("tool_input") == {"query": "FastAPI"}
+    assert call_kwargs.get("denied") is False
+
+
+def test_decision_tool_node_records_denied_tool_call():
+    """Verify that decision_tool_node records denied tool calls."""
+    with patch("agents.decision.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        state = _decision_state()
+        state["route"] = "knowledge_base"
+        state["messages"].append({
+            "role": "assistant",
+            "content": [{"type": "tool_use", "id": "tu_1", "name": "read_file", "input": {"path": "/etc/passwd"}}],
+        })
+        with patch("builtins.input", return_value="n"):
+            result = decision_tool_node(state)
+
+    # Verify record_tool_call was called with denied=True
+    mock_tracer.record_tool_call.assert_called_once()
+    call_kwargs = mock_tracer.record_tool_call.call_args[1]
+    assert call_kwargs.get("name") == "read_file"
+    assert call_kwargs.get("denied") is True
 
 
 # ── Streaming tracer instrumentation ────────────────────────────────────────
