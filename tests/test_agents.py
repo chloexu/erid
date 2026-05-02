@@ -163,7 +163,8 @@ def _research_state(query: str = "What is LangGraph?", route: str = "research") 
     }
 
 
-def test_researcher_agent_node_returns_updated_messages():
+@patch("agents.researcher.get_tracer")
+def test_researcher_agent_node_returns_updated_messages(mock_get_tracer):
     with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Done."}]):
         state = _research_state()
         result = researcher_agent_node(state)
@@ -172,14 +173,16 @@ def test_researcher_agent_node_returns_updated_messages():
     assert result["iterations"] == 1
 
 
-def test_researcher_agent_node_codebase_route():
+@patch("agents.researcher.get_tracer")
+def test_researcher_agent_node_codebase_route(mock_get_tracer):
     with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Found it."}]):
         state = _research_state(query="How does auth work?", route="codebase")
         result = researcher_agent_node(state)
     assert result["iterations"] == 1
 
 
-def test_researcher_agent_node_knowledge_base_route():
+@patch("agents.researcher.get_tracer")
+def test_researcher_agent_node_knowledge_base_route(mock_get_tracer):
     with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Your lessons say..."}]):
         state = _research_state(query="What lessons have I learned?", route="knowledge_base")
         result = researcher_agent_node(state)
@@ -214,7 +217,8 @@ def test_researcher_should_continue_max_iterations():
     assert researcher_should_continue(state) == "summarize"
 
 
-def test_researcher_tool_node_executes_search():
+@patch("agents.researcher.get_tracer")
+def test_researcher_tool_node_executes_search(mock_get_tracer):
     state = _research_state()
     state["messages"].append({
         "role": "assistant",
@@ -268,8 +272,11 @@ def test_researcher_tool_node_records_tool_call():
         with patch("agents.researcher._dispatch", return_value="result"):
             researcher_tool_node(state)
 
-    # Verify record_tool_call was called
+    # Verify record_tool_call was called with name="search" and denied=False
     mock_tracer.record_tool_call.assert_called_once()
+    call_kwargs = mock_tracer.record_tool_call.call_args[1]
+    assert call_kwargs.get("name") == "search"
+    assert call_kwargs.get("denied") is False
 
 
 # ── Summarizer ─────────────────────────────────────────────────────────────────
