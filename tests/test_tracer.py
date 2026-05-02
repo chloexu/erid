@@ -3,6 +3,7 @@ import sqlite3
 import pytest
 from pathlib import Path
 from observability.tracer import NullTracer, Tracer, _compute_cost
+from observability.inspect import inspect_run
 
 
 def test_compute_cost_sonnet():
@@ -150,8 +151,6 @@ def test_tracer_seq_resets_on_second_start_run(tmp_tracer):
 
 
 # ── Inspect ──────────────────────────────────────────────────────────────────
-
-from observability.inspect import inspect_run
 
 
 def _seed_db(tmp_tracer):
