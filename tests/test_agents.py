@@ -28,7 +28,8 @@ def _mock_stream(text: str):
     return mock
 
 
-def test_supervisor_routes_research():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_routes_research(mock_get_tracer):
     text = "Reasoning: web lookup needed\nRoute: research"
     with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
         with patch("agents.supervisor._client") as mock_client:
@@ -37,7 +38,8 @@ def test_supervisor_routes_research():
     assert result["route"] == "research"
 
 
-def test_supervisor_routes_codebase():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_routes_codebase(mock_get_tracer):
     text = "Reasoning: exploring local code\nRoute: codebase"
     with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
         with patch("agents.supervisor._client") as mock_client:
@@ -46,7 +48,8 @@ def test_supervisor_routes_codebase():
     assert result["route"] == "codebase"
 
 
-def test_supervisor_routes_decide():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_routes_decide(mock_get_tracer):
     text = "Reasoning: decision needed\nRoute: decide"
     with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
         with patch("agents.supervisor._client") as mock_client:
@@ -55,7 +58,8 @@ def test_supervisor_routes_decide():
     assert result["route"] == "decide"
 
 
-def test_supervisor_routes_knowledge_base():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_routes_knowledge_base(mock_get_tracer):
     text = "Reasoning: querying personal KB\nRoute: knowledge_base"
     with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
         with patch("agents.supervisor._client") as mock_client:
@@ -64,7 +68,8 @@ def test_supervisor_routes_knowledge_base():
     assert result["route"] == "knowledge_base"
 
 
-def test_supervisor_defaults_to_research_on_unknown_route():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_defaults_to_research_on_unknown_route(mock_get_tracer):
     text = "Reasoning: unclear\nRoute: something_else"
     with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
         with patch("agents.supervisor._client") as mock_client:
@@ -73,7 +78,8 @@ def test_supervisor_defaults_to_research_on_unknown_route():
     assert result["route"] == "research"
 
 
-def test_supervisor_asks_clarification_when_ambiguous():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_asks_clarification_when_ambiguous(mock_get_tracer):
     text = "Reasoning: exploring local code\nRoute: codebase"
     with patch("agents.supervisor._check_clarity", side_effect=[(False, "Which project?"), (True, "none")]):
         with patch("agents.supervisor._client") as mock_client:
@@ -85,7 +91,8 @@ def test_supervisor_asks_clarification_when_ambiguous():
     assert "Answer: chefs-hub" in result["query"]
 
 
-def test_supervisor_enriched_query_passed_to_messages():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_enriched_query_passed_to_messages(mock_get_tracer):
     text = "Reasoning: exploring local code\nRoute: codebase"
     with patch("agents.supervisor._check_clarity", side_effect=[(False, "Which project?"), (True, "none")]):
         with patch("agents.supervisor._client") as mock_client:
@@ -95,7 +102,8 @@ def test_supervisor_enriched_query_passed_to_messages():
     assert result["messages"] == [{"role": "user", "content": result["query"]}]
 
 
-def test_supervisor_proceeds_after_max_clarifications():
+@patch("agents.supervisor.get_tracer")
+def test_supervisor_proceeds_after_max_clarifications(mock_get_tracer):
     text = "Reasoning: web lookup needed\nRoute: research"
     with patch("agents.supervisor._check_clarity", return_value=(False, "Be more specific?")):
         with patch("agents.supervisor._client") as mock_client:
