@@ -1,4 +1,5 @@
 import anthropic
+from observability import get_tracer
 
 _client = anthropic.Anthropic()
 
@@ -63,6 +64,7 @@ def supervisor_node(state) -> dict:
         answer = input("Your answer: ").strip()
         if not answer:
             break
+        get_tracer().record_clarification(question, answer)
         query += f"\n\nClarifying question: {question}\nAnswer: {answer}"
 
     print("\n[supervisor] Classifying query...", flush=True)
@@ -86,6 +88,7 @@ def supervisor_node(state) -> dict:
                 route = extracted
             break
 
+    get_tracer().record_routing(route, text)
     print(f"\n[routing -> {route}]\n", flush=True)
     return {
         "route": route,

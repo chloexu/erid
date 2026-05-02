@@ -106,6 +106,40 @@ def test_supervisor_proceeds_after_max_clarifications():
     assert result["query"].count("Clarifying question:") == 2
 
 
+def test_supervisor_records_clarification():
+    """Verify that clarification questions are recorded via tracer."""
+    with patch("agents.supervisor._check_clarity", side_effect=[(False, "Which project?"), (True, "none")]):
+        with patch("agents.supervisor._client") as mock_client:
+            text = "Reasoning: exploring local code\nRoute: codebase"
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            with patch("builtins.input", return_value="chefs-hub"):
+                with patch("agents.supervisor.get_tracer") as mock_get_tracer:
+                    mock_tracer = MagicMock()
+                    mock_get_tracer.return_value = mock_tracer
+                    result = supervisor_node(_base_state("how does auth work?"))
+
+    # Verify record_clarification was called with the question and answer
+    mock_tracer.record_clarification.assert_called_once_with("Which project?", "chefs-hub")
+
+
+def test_supervisor_records_routing():
+    """Verify that routing is recorded via tracer with reasoning."""
+    text = "Reasoning: exploring local code\nRoute: codebase"
+    with patch("agents.supervisor._check_clarity", return_value=(True, "none")):
+        with patch("agents.supervisor._client") as mock_client:
+            mock_client.messages.stream.return_value = _mock_stream(text)
+            with patch("agents.supervisor.get_tracer") as mock_get_tracer:
+                mock_tracer = MagicMock()
+                mock_get_tracer.return_value = mock_tracer
+                result = supervisor_node(_base_state("How does auth work in chefs-hub?"))
+
+    # Verify record_routing was called with route and the full text as reasoning
+    mock_tracer.record_routing.assert_called_once()
+    call_args = mock_tracer.record_routing.call_args
+    assert call_args[0][0] == "codebase"  # route
+    assert "exploring local code" in call_args[0][1]  # reasoning contains the text
+
+
 # ── Researcher ─────────────────────────────────────────────────────────────────
 
 from agents.researcher import researcher_agent_node, researcher_tool_node, researcher_should_continue
