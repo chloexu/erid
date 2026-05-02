@@ -56,7 +56,7 @@ class NullTracer:
     def record_routing(self, route: str, reasoning: str) -> None: pass
     def record_node_start(self, label: str) -> None: pass
     def record_llm_call(self, label: str, model: str, input_tok: int, output_tok: int, duration_ms: int) -> None: pass
-    def record_tool_call(self, name: str, input: dict, duration_ms: int, denied: bool = False) -> None: pass
+    def record_tool_call(self, name: str, tool_input: dict, duration_ms: int, denied: bool = False) -> None: pass
     def finish_run(self, answer: str, duration_ms: int) -> None: pass
 
 
@@ -72,6 +72,9 @@ class Tracer:
         self._init_db()
 
     def _init_db(self) -> None:
+        """Initialise the SQLite database. Raises on failure (e.g. permission error).
+        This is intentional: if the DB cannot be created at startup, the caller
+        should handle it. Unlike write methods, DB init failure is not best-effort."""
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self._db_path) as conn:
             conn.executescript(_SCHEMA)
@@ -166,12 +169,12 @@ class Tracer:
         )
 
     def record_tool_call(
-        self, name: str, input: dict, duration_ms: int, denied: bool = False
+        self, name: str, tool_input: dict, duration_ms: int, denied: bool = False
     ) -> None:
         self._insert_event(
             "tool_call", name,
             duration_ms=duration_ms,
-            detail={"input": input, "denied": denied},
+            detail={"input": tool_input, "denied": denied},
         )
 
     def finish_run(self, answer: str, duration_ms: int) -> None:

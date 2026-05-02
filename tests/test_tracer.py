@@ -1,6 +1,6 @@
+import json
 import sqlite3
 import pytest
-from unittest.mock import MagicMock
 from pathlib import Path
 from observability.tracer import NullTracer, Tracer, _compute_cost
 
@@ -88,7 +88,6 @@ def test_tracer_record_tool_call_inserts_event(tmp_tracer):
             "SELECT * FROM events WHERE run_id = ? AND event_type = 'tool_call'",
             ("run-123",)
         ).fetchone()
-    import json
     assert row["name"] == "search"
     assert row["duration_ms"] == 350
     detail = json.loads(row["detail"])
@@ -105,7 +104,6 @@ def test_tracer_record_tool_call_denied(tmp_tracer):
             "SELECT * FROM events WHERE run_id = ? AND event_type = 'tool_call'",
             ("run-123",)
         ).fetchone()
-    import json
     assert json.loads(row["detail"])["denied"] is True
 
 
@@ -136,3 +134,16 @@ def test_tracer_events_have_sequential_seq(tmp_tracer):
             "SELECT seq FROM events WHERE run_id = ? ORDER BY seq", ("run-123",)
         ).fetchall()]
     assert seqs == [1, 2, 3]
+
+
+def test_tracer_seq_resets_on_second_start_run(tmp_tracer):
+    tmp_tracer.start_run("run-001", "first query")
+    tmp_tracer.record_node_start("researcher")
+    tmp_tracer.record_node_start("summarizer")
+    tmp_tracer.start_run("run-002", "second query")
+    tmp_tracer.record_node_start("supervisor")
+    with sqlite3.connect(tmp_tracer._db_path) as conn:
+        seqs = [r[0] for r in conn.execute(
+            "SELECT seq FROM events WHERE run_id = ? ORDER BY seq", ("run-002",)
+        ).fetchall()]
+    assert seqs == [1]
