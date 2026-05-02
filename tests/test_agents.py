@@ -228,6 +228,50 @@ def test_researcher_tool_node_executes_search():
     assert last["content"][0]["content"] == "Search results here"
 
 
+def test_researcher_agent_node_records_node_start():
+    """Verify that researcher_agent_node records node_start via tracer."""
+    with patch("agents.researcher.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Done."}]):
+            state = _research_state()
+            researcher_agent_node(state)
+
+    mock_tracer.record_node_start.assert_called_once_with("researcher")
+
+
+def test_researcher_agent_node_passes_tracer_to_stream():
+    """Verify that researcher_agent_node passes tracer to stream_agent_turn."""
+    with patch("agents.researcher.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        with patch("agents.researcher.stream_agent_turn", return_value=[{"type": "text", "text": "Done."}]) as mock_stream:
+            state = _research_state()
+            researcher_agent_node(state)
+
+    # Verify stream_agent_turn was called with tracer=mock_tracer
+    mock_stream.assert_called_once()
+    call_kwargs = mock_stream.call_args[1]
+    assert call_kwargs.get("tracer") is mock_tracer
+
+
+def test_researcher_tool_node_records_tool_call():
+    """Verify that researcher_tool_node records tool_call via tracer."""
+    with patch("agents.researcher.get_tracer") as mock_get_tracer:
+        mock_tracer = MagicMock()
+        mock_get_tracer.return_value = mock_tracer
+        state = _research_state()
+        state["messages"].append({
+            "role": "assistant",
+            "content": [{"type": "tool_use", "id": "tu_1", "name": "search", "input": {"query": "LangGraph"}}],
+        })
+        with patch("agents.researcher._dispatch", return_value="result"):
+            researcher_tool_node(state)
+
+    # Verify record_tool_call was called
+    mock_tracer.record_tool_call.assert_called_once()
+
+
 # ── Summarizer ─────────────────────────────────────────────────────────────────
 
 from agents.summarizer import summarizer_node
