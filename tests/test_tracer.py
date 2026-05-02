@@ -147,3 +147,65 @@ def test_tracer_seq_resets_on_second_start_run(tmp_tracer):
             "SELECT seq FROM events WHERE run_id = ? ORDER BY seq", ("run-002",)
         ).fetchall()]
     assert seqs == [1]
+
+
+# ── Inspect ──────────────────────────────────────────────────────────────────
+
+from observability.inspect import inspect_run
+
+
+def _seed_db(tmp_tracer):
+    """Seed a complete run for inspect tests."""
+    tmp_tracer.start_run("abc12345", "How does auth work?")
+    tmp_tracer.record_routing("codebase", "exploring local code")
+    tmp_tracer.record_node_start("researcher")
+    tmp_tracer.record_tool_call("list_directory", {"path": "."}, 120)
+    tmp_tracer.record_tool_call("read_file", {"path": "/etc/passwd"}, 0, denied=True)
+    tmp_tracer.record_llm_call("researcher", "claude-sonnet-4-6", 1842, 312, 3200)
+    tmp_tracer.record_node_start("summarizer")
+    tmp_tracer.record_llm_call("summarizer", "claude-sonnet-4-6", 2104, 489, 2900)
+    tmp_tracer.finish_run("Auth uses JWT tokens.", 8300)
+
+
+def test_inspect_run_prints_header(tmp_tracer, capsys):
+    _seed_db(tmp_tracer)
+    inspect_run("abc12345", tmp_tracer._db_path)
+    out = capsys.readouterr().out
+    assert "abc12345" in out
+    assert "codebase" in out
+    assert "8.3s" in out
+    assert "$" in out
+
+
+def test_inspect_run_prints_timeline(tmp_tracer, capsys):
+    _seed_db(tmp_tracer)
+    inspect_run("abc12345", tmp_tracer._db_path)
+    out = capsys.readouterr().out
+    assert "researcher" in out
+    assert "list_directory" in out
+    assert "[denied]" in out
+    assert "summarizer" in out
+
+
+def test_inspect_run_prints_summary(tmp_tracer, capsys):
+    _seed_db(tmp_tracer)
+    inspect_run("abc12345", tmp_tracer._db_path)
+    out = capsys.readouterr().out
+    assert "Route:" in out
+    assert "Tokens:" in out
+    assert "Cost:" in out
+    assert "Answer:" in out
+    assert "Auth uses JWT" in out
+
+
+def test_inspect_run_unknown_id(tmp_tracer, capsys):
+    inspect_run("nonexistent", tmp_tracer._db_path)
+    out = capsys.readouterr().out
+    assert "No run found" in out
+
+
+def test_inspect_run_last(tmp_tracer, capsys):
+    _seed_db(tmp_tracer)
+    inspect_run("last", tmp_tracer._db_path)
+    out = capsys.readouterr().out
+    assert "abc12345" in out
