@@ -25,6 +25,7 @@ def summarizer_node(state) -> dict:
         system=SUMMARIZER_SYSTEM,
         messages=messages,
         label="summarizer",
+        model="claude-haiku-4-5-20251001",
         tracer=tracer,
     )
     return {"answer": answer}

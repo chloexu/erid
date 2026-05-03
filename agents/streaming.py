@@ -96,6 +96,7 @@ def stream_text_turn(
     system: str,
     messages: list,
     label: str,
+    model: str = MODEL,
     max_tokens: int = 2048,
     tracer=None,
 ) -> str:
@@ -107,7 +108,7 @@ def stream_text_turn(
     t_start = time.monotonic()
 
     with client.messages.stream(
-        model=MODEL,
+        model=model,
         max_tokens=max_tokens,
         system=system,
         messages=messages,
@@ -119,7 +120,7 @@ def stream_text_turn(
     duration_ms = int((time.monotonic() - t_start) * 1000)
     tracer.record_llm_call(
         label=label,
-        model=MODEL,
+        model=model,
         input_tok=final.usage.input_tokens,
         output_tok=final.usage.output_tokens,
         duration_ms=duration_ms,

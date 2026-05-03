@@ -23,24 +23,24 @@ Personal research + decision assistant. Supervisor routes to four paths: web res
 
 ---
 
-## Phase 3 — Human-in-the-loop ✓ (in progress)
+## Phase 3 — Human-in-the-loop ✓
 
-Supervisor pauses on ambiguous queries and asks the user to clarify before routing. Enriched query (original + clarifying Q&A) is passed to all downstream agents. Max 2 clarification rounds before proceeding. Uses Haiku for the lightweight clarity check, Sonnet for classification.
+Supervisor pauses on ambiguous queries and asks the user to clarify before routing. Enriched query (original + clarifying Q&A) is passed to all downstream agents. Max 2 clarification rounds before proceeding. Uses Haiku for the lightweight clarity check, Sonnet for classification. Decision framing confirmation (Haiku extracts framing, user confirms/corrects before research). File access boundaries: blocks absolute paths and path traversal; KB route restricted to `knowledge-base/`.
 
 Teaches: when to interrupt vs. proceed, structured human-in-the-loop without a checkpointer, cheap pre-flight LLM calls.
 
-Next: additional HITL moments (decision framing confirmation, file access boundaries).
-
 ---
 
-## Phase 4 — Observability
+## Phase 4 — Observability ✓
 
-Every run writes a structured JSON trace: token counts, tool calls, latency per node, routing decisions, final answer. `--inspect <run-id>` CLI to replay any past run. Teaches: production debuggability, cost tracking.
+Every run writes a structured trace to SQLite (`~/.erid/traces.db`): token counts, tool calls, latency per node, routing decisions, cost per call, final answer. `--inspect <run-id>` (or `--inspect last`) CLI replays any past run as a timeline + summary. Summarizer uses Haiku (~4x cheaper than Sonnet) since synthesis is a writing task, not a reasoning task.
+
+Teaches: production debuggability, cost tracking, model cost optimization.
 
 Provides real run data for Phase 5 evals.
 
-- Spec: *to be written*
-- Plan: *to be written*
+- Spec: `specs/2026-05-02-phase4-observability-design.md`
+- Plan: `plans/2026-05-02-erid-phase4.md`
 
 ---
 

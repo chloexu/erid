@@ -58,36 +58,16 @@ python main.py "How does auth work in my chefs-hub project?"
 python main.py "Should I use FastAPI or Django for this service?"
 ```
 
-### Output modes
+### Inspect past runs
 
-By default, output uses simple labels:
-
-```
-Thinking...
-[tool_use] search
-[tool_result] search
-  <raw Tavily response>
-Thinking...
-<final answer streams here>
-```
-
-Add `--verbose` (or `-v`) to see granular labels that show exactly what each line is and where it comes from:
-
-```
-[agent: loop 1/10] deciding next action...   ← local loop, LLM about to stream
-<raw LLM tokens>                             ← Anthropic stream, unprocessed
-[tool_call → search]                         ← LLM decided to call a tool
-  input: {'query': '...'}
-[tool_result ← search] raw response:         ← raw Tavily API response, no processing
-  <result>
-[agent: loop 2/10] deciding next action...
-<final answer streams here>
-```
+Every run is traced to `~/.erid/traces.db`. Use `--inspect` to replay any run:
 
 ```bash
-python main.py "What is LangGraph?" --verbose
-python main.py "What is LangGraph?" -v
+python main.py --inspect last          # most recent run
+python main.py --inspect <run-id>      # specific run by ID
 ```
+
+Output shows a full timeline: nodes, tool calls, token counts, cost, and the final answer.
 
 ## Phases
 
@@ -95,8 +75,8 @@ python main.py "What is LangGraph?" -v
 |-------|-------|--------|
 | 1 | ReAct loop + streaming | ✓ Complete |
 | 2 | Tools, orchestration, personal KB | ✓ Complete |
-| 3 | Human-in-the-loop | In progress |
-| 4 | Observability | Planned |
+| 3 | Human-in-the-loop | ✓ Complete |
+| 4 | Observability | ✓ Complete |
 | 5 | Evals | Planned |
 | 6 | Semantic memory (RAG) | Planned |
 
